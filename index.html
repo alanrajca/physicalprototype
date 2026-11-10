@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FreshCam v0.3: Wire-Free Magnetic ESP32-CAM Fridge Scanner (3D Concept)</title>
+<title>FreshCam v0.4: XIAO ESP32S3 Sense, Auto-Wake, Wire-Free Fridge Scanner (3D Concept)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -24,7 +24,7 @@
   .lbl.detail{border-left:3px solid var(--accent)}
   .lbl.new{border-left:3px solid var(--new)}
 
-  #panel{position:fixed;top:16px;left:16px;width:340px;max-height:calc(100% - 32px);overflow:auto;
+  #panel{position:fixed;top:16px;left:16px;width:345px;max-height:calc(100% - 32px);overflow:auto;
          background:var(--panel);border:1px solid var(--line);border-radius:16px;
          box-shadow:0 20px 50px rgba(0,0,0,.10);padding:20px 20px 16px}
   .eyebrow{font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
@@ -32,7 +32,7 @@
   .sub{font-size:12.5px;color:var(--muted);line-height:1.45}
   h2{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:18px 0 8px}
   .views{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
-  .mounts{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .mounts,.scans{display:grid;grid-template-columns:1fr 1fr;gap:6px}
   button{font:inherit;font-size:12.5px;font-weight:500;border:1px solid var(--line);background:#fff;color:var(--ink);
          padding:8px 10px;border-radius:9px;cursor:pointer;transition:.15s;text-align:left}
   .views button{text-align:center}
@@ -41,9 +41,10 @@
   .mounts button b{display:block;font-weight:600;font-size:12.5px}
   .mounts button span{display:block;font-size:11px;opacity:.7;margin-top:1px}
   .mountdesc{font-size:12px;line-height:1.5;background:var(--accent-soft);border-radius:10px;padding:10px 12px;margin-top:8px}
-  #scanBtn{width:100%;margin-top:8px;background:var(--accent-soft);border-color:transparent;color:var(--accent);font-weight:600;text-align:center}
-  #scanBtn:hover{background:var(--accent);color:#fff}
-  .toggle{display:flex;align-items:center;justify-content:space-between;font-size:13px;padding:6px 0;cursor:pointer}
+  .scans{margin-top:8px}
+  .scans button{background:var(--accent-soft);border-color:transparent;color:var(--accent);font-weight:600;text-align:center}
+  .scans button:hover{background:var(--accent);color:#fff}
+  .toggle{display:flex;align-items:center;justify-content:space-between;font-size:13px;padding:6px 0;cursor:pointer;gap:10px}
   .toggle input{appearance:none;width:34px;height:20px;border-radius:20px;background:#d5d3cd;position:relative;cursor:pointer;transition:.2s;flex-shrink:0}
   .toggle input::after{content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#fff;transition:.2s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
   .toggle input:checked{background:var(--accent)}
@@ -52,13 +53,17 @@
   td{padding:5px 0;border-bottom:1px solid var(--line);vertical-align:top}
   td:last-child{text-align:right;font-family:'JetBrains Mono',monospace;white-space:nowrap;padding-left:8px}
   tr.total td{font-weight:700;border-bottom:none;padding-top:8px}
+  tr.removed td{color:var(--muted);text-decoration:line-through}
   .spec{font-size:12px;line-height:1.55;color:#333}
   .spec li{margin-left:16px;margin-bottom:2px}
   .changes{font-size:12px;line-height:1.5;background:#f4efe5;border-radius:10px;padding:10px 12px;margin-top:12px}
   .changes b{color:#9a6420}
   .battery{font-size:12px;line-height:1.5}
   .battery .big{font-size:20px;font-weight:700;letter-spacing:-.01em}
+  .battery table{margin-top:8px}
   .note{font-size:11px;color:var(--muted);margin-top:12px;line-height:1.45}
+  #status{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);font-family:'JetBrains Mono',monospace;font-size:12px;
+          background:#1b201e;color:#e9f5ef;padding:8px 14px;border-radius:20px;opacity:0;transition:opacity .25s;pointer-events:none}
   #hint{position:fixed;right:16px;bottom:16px;font-size:11.5px;color:var(--muted);background:rgba(251,250,247,.85);
         padding:8px 12px;border-radius:10px;border:1px solid var(--line)}
   @media (max-width:700px){#panel{width:calc(100% - 32px);max-height:45%}}
@@ -74,17 +79,19 @@
 <div id="app"></div>
 
 <aside id="panel">
-  <div class="eyebrow">Concept model · v0.3</div>
+  <div class="eyebrow">Concept model · v0.4</div>
   <h1>FreshCam Prototype</h1>
-  <p class="sub">A wire-free ESP32-CAM barcode &amp; expiration-date scanner in a matte black shell, with magnets on three sides so it can mount wherever works best.</p>
+  <p class="sub">A wire-free barcode &amp; expiration-date scanner built on the Seeed XIAO ESP32S3 Sense. It wakes itself when you walk up with an item, then switches fully off between scans.</p>
 
   <div class="changes">
-    <b>Changes in v0.3</b><br>
-    • Internal 1500 mAh battery, so no cable to the wall<br>
-    • USB-C port on top is now for charging only<br>
-    • Front scan button wakes the device to save battery<br>
-    • Magnets on the left, right and back (6 total)<br>
-    • 4 mounting options, including inside the fridge
+    <b>Changes in v0.4</b><br>
+    • ESP32-CAM → XIAO ESP32S3 Sense (built-in USB-C charging)<br>
+    • Charger board + boost converter removed<br>
+    • Autofocus camera (OV5640/OV3660) for close-range barcodes<br>
+    • Auto-wake: a small motion sensor (PIR) behind a black lens<br>
+    • Scan button kept as a manual backup<br>
+    • Added a white flash LED (the XIAO doesn't have one)<br>
+    • Same 40 × 60 × 27 mm shell, magnets and mounting options
   </div>
 
   <h2>Mounting option</h2>
@@ -102,50 +109,62 @@
     <button data-view="close">Close-up</button>
     <button data-view="exploded">Exploded</button>
   </div>
-  <button id="scanBtn">▶ Simulate a scan</button>
+  <div class="scans">
+    <button id="autoBtn">▶ Auto-wake scan</button>
+    <button id="pressBtn">▶ Button scan</button>
+  </div>
 
   <h2>Display</h2>
   <label class="toggle">Exploded view <input type="checkbox" id="tExplode"></label>
-  <label class="toggle">See-through shell (shows battery + magnets) <input type="checkbox" id="tXray"></label>
+  <label class="toggle">See-through shell (shows XIAO, battery, magnets) <input type="checkbox" id="tXray"></label>
   <label class="toggle">Camera field of view + item <input type="checkbox" id="tFov" checked></label>
   <label class="toggle">Labels <input type="checkbox" id="tLabels" checked></label>
 
   <h2>Battery life (estimate)</h2>
   <div class="battery">
-    <div class="big">~1,000–2,000 scans per charge</div>
-    About <b>3–6 months</b> at ~10 scans a day. The device is fully powered off between scans: pressing the button turns it on, it scans, uploads over Wi-Fi, then cuts its own power.<br>
-    <span style="color:var(--muted)">This requires the power-latch circuit. If the ESP32-CAM only uses its built-in sleep mode instead, the battery lasts roughly 1–3 weeks.</span>
+    <div class="big">~2–4 months per charge</div>
+    With auto-wake on: 10 scans a day plus ~40 false wake-ups from people walking past. Button-only use could last <b>6+ months</b>.
+    <table>
+      <tr><td>Motion sensor, always on (≤0.1 mA)</td><td>≤2.4 mAh/day</td></tr>
+      <tr><td>False wake-ups (~3 s, no Wi-Fi)</td><td>~4 mAh/day</td></tr>
+      <tr><td>Real scans (~8 s incl. Wi-Fi upload)</td><td>~5.5 mAh/day</td></tr>
+      <tr class="total"><td>Total vs ~1,300 mAh usable</td><td>~12 mAh/day</td></tr>
+    </table>
+    <p class="note" style="margin-top:6px">Why there's still a power switch: the XIAO chip sleeps at ~14 µA, but with the camera attached it draws ~3 mA in sleep, and users report ~90 mA after the camera has been used. So the circuit cuts power completely, and the motion sensor or button turns it back on.</p>
   </div>
 
   <h2>Design specs</h2>
   <ul class="spec">
-    <li><b>Enclosure:</b> 40 × 60 × 27 mm, 2-part snap-fit, matte black PETG/ASA</li>
-    <li><b>Battery:</b> 3.7 V 1500 mAh LiPo (803450, protected), USB-C charging</li>
-    <li><b>Magnets:</b> 6× N52, 12 × 3 mm, two each on the left, right and back, behind rubber grip pads so pressing the button doesn't slide it</li>
-    <li><b>Wake:</b> front button turns the unit on through a power-latch circuit; it switches itself off after each scan</li>
-    <li><b>Scan distance:</b> ~15–30 cm in front of the lens, flash LED for low light</li>
-    <li><b>Board:</b> ESP32-CAM with pin headers removed, wires soldered directly so the battery fits behind it</li>
+    <li><b>Board:</b> Seeed XIAO ESP32S3 Sense, 21 × 17.5 × 15 mm with camera board</li>
+    <li><b>Camera:</b> OV5640 autofocus (current shipments; some ship OV3660)</li>
+    <li><b>Battery:</b> 3.7 V 1500 mAh LiPo (803450, protected), wired to the XIAO's battery pads through the power switch</li>
+    <li><b>Charging:</b> XIAO's own USB-C at ~100 mA, so a full charge takes about 15–18 hours</li>
+    <li><b>Wake:</b> AM312 mini PIR sensor <i>or</i> button → power switch on → scan → upload → off</li>
+    <li><b>Wi-Fi:</b> flexible antenna on the inside of the front shell, away from the battery</li>
+    <li><b>Magnets:</b> 6× N52, 12 × 3 mm (left, right, back) behind rubber grip pads</li>
+    <li><b>Enclosure:</b> 40 × 60 × 27 mm matte black PETG/ASA, 2-part snap-fit</li>
   </ul>
 
   <h2>Bill of materials</h2>
   <table>
-    <tr><td>ESP32-CAM (AI-Thinker, OV2640)</td><td>~$10</td></tr>
-    <tr><td>1500 mAh 3.7 V LiPo, protected (803450)</td><td>~$8</td></tr>
-    <tr><td>USB-C LiPo charger board (TP4056-type)</td><td>~$1.50</td></tr>
-    <tr><td>5 V boost converter</td><td>~$1.50</td></tr>
-    <tr><td>Power-latch circuit (MOSFET + resistors)</td><td>~$1</td></tr>
+    <tr><td>Seeed XIAO ESP32S3 Sense (with camera)</td><td>~$14–20</td></tr>
+    <tr><td>1500 mAh 3.7 V LiPo, protected</td><td>~$8</td></tr>
+    <tr><td>AM312 mini PIR motion sensor</td><td>~$1.50</td></tr>
+    <tr><td>Power switch circuit (P-MOSFET, diodes, resistors)</td><td>~$1</td></tr>
+    <tr><td>White flash LED + resistor</td><td>~$0.30</td></tr>
     <tr><td>Tactile scan button</td><td>~$0.50</td></tr>
-    <tr><td>6× N52 magnets, 12 × 3 mm</td><td>~$5</td></tr>
-    <tr><td>Rubber grip pads ×3</td><td>~$1</td></tr>
+    <tr><td>6× N52 magnets + 3 rubber pads</td><td>~$6</td></tr>
     <tr><td>Adhesive steel plate (inside / stainless mounts)</td><td>~$2</td></tr>
-    <tr><td>3D-printed enclosure (~22 g, matte black)</td><td>~$1.50</td></tr>
-    <tr class="total"><td>Estimated total</td><td>~$32</td></tr>
+    <tr><td>3D-printed enclosure (~22 g)</td><td>~$1.50</td></tr>
+    <tr class="removed"><td>ESP32-CAM, charger board, boost converter</td><td>−$13</td></tr>
+    <tr class="removed"><td>ESP32-CAM-MB programmer (one-time)</td><td>−$5</td></tr>
+    <tr class="total"><td>Estimated total</td><td>~$35–41</td></tr>
   </table>
-  <p class="note">The wall adapter and long cable are gone. Charge it with any USB-C phone charger.<br><br>
-  <b>Worth considering for v0.4:</b> a Seeed XIAO ESP32S3 Sense board (~$14–20) has a camera, built-in battery charging and much lower sleep power. It could replace the charger board and the boost converter, and make it practical for the unit to wake automatically.<br><br>
-  Concept visualization. Dimensions, battery life and prices are estimates. Programming the ESP32-CAM also needs a one-time ESP32-CAM-MB programmer (~$5).</p>
+  <p class="note">About $3–9 more per unit than v0.3, in exchange for automatic wake, autofocus, a simpler build and programming over the XIAO's own USB-C.<br><br>
+  Concept visualization. Dimensions, battery life and prices are estimates. Measure real current draw on a prototype before relying on these numbers.</p>
 </aside>
 
+<div id="status"></div>
 <div id="hint">Drag to orbit · Scroll to zoom · Right-drag to pan</div>
 
 <script type="module">
@@ -219,6 +238,7 @@ const M = {
   base:   new THREE.MeshStandardMaterial({ color:0x161718, roughness:0.92, metalness:0.0 }),
   button: new THREE.MeshStandardMaterial({ color:0x2a2b2e, roughness:0.72 }),
   accent: new THREE.MeshStandardMaterial({ color:0x2e8b6f, emissive:0x1f6f5c, emissiveIntensity:0.35, roughness:0.5 }),
+  pir:    new THREE.MeshStandardMaterial({ color:0x2a2c2f, roughness:0.42, flatShading:true, emissive:0x2bd47d, emissiveIntensity:0 }),
   rubber: new THREE.MeshStandardMaterial({ color:0x2c2d2e, roughness:1.0 }),
   padOn:  new THREE.MeshStandardMaterial({ color:0x2f8f74, emissive:0x15503f, emissiveIntensity:0.6, roughness:0.9 }),
   slot:   new THREE.MeshStandardMaterial({ color:0x060606, roughness:0.9 }),
@@ -234,13 +254,16 @@ const M = {
   pcb:    new THREE.MeshStandardMaterial({ color:0x1e2229, roughness:0.55 }),
   pcbBlue:new THREE.MeshStandardMaterial({ color:0x26407e, roughness:0.55 }),
   pcbGrn: new THREE.MeshStandardMaterial({ color:0x2d6b3c, roughness:0.55 }),
+  pcbW:   new THREE.MeshStandardMaterial({ color:0xeceae4, roughness:0.6 }),
   can:    new THREE.MeshStandardMaterial({ color:0xc3c6ca, metalness:0.95, roughness:0.28 }),
   gold:   new THREE.MeshStandardMaterial({ color:0xd6a838, metalness:1, roughness:0.3 }),
   ribbon: new THREE.MeshStandardMaterial({ color:0xd88a1d, roughness:0.5 }),
+  antenna:new THREE.MeshStandardMaterial({ color:0x3a3d42, roughness:0.5 }),
   batt:   new THREE.MeshStandardMaterial({ color:0xaab4bf, metalness:0.6, roughness:0.35 }),
   cord:   new THREE.MeshStandardMaterial({ color:0x202224, roughness:0.5 }),
   red:    new THREE.MeshStandardMaterial({ color:0xd23a2f, roughness:0.5 }),
   blackW: new THREE.MeshStandardMaterial({ color:0x161616, roughness:0.5 }),
+  yellow: new THREE.MeshStandardMaterial({ color:0xd8b630, roughness:0.5 }),
   plate:  new THREE.MeshStandardMaterial({ color:0xf7f5ef, roughness:0.5 }),
   socket: new THREE.MeshStandardMaterial({ color:0xebe7dc, roughness:0.6 }),
 };
@@ -263,20 +286,17 @@ mesh(new THREE.BoxGeometry(8, 0.08, 0.012), M.trim, scene).position.set(0, 0.04,
 const FW = 0.76, FX = FW/2, FBACK = -0.40, FFRONT = 0.30, FTOP = 1.73, FBOT = 0.03, DT = 0.055;
 const ZC = (FFRONT+FBACK)/2, DEP = FFRONT-FBACK;
 const fridge = new THREE.Group(); scene.add(fridge);
-mesh(new THREE.BoxGeometry(FW, FTOP-1.17, DEP), M.steel, fridge).position.set(0, (FTOP+1.17)/2, ZC); // freezer block
-mesh(new THREE.BoxGeometry(FW, 0.13-FBOT, DEP), M.steel, fridge).position.set(0, (0.13+FBOT)/2, ZC); // base block
+mesh(new THREE.BoxGeometry(FW, FTOP-1.17, DEP), M.steel, fridge).position.set(0, (FTOP+1.17)/2, ZC);
+mesh(new THREE.BoxGeometry(FW, 0.13-FBOT, DEP), M.steel, fridge).position.set(0, (0.13+FBOT)/2, ZC);
 [-1,1].forEach(s=> mesh(new THREE.BoxGeometry(0.04, 1.04, DEP), M.steel, fridge).position.set(s*0.36, 0.65, ZC));
 mesh(new THREE.BoxGeometry(0.68, 1.04, 0.04), M.steel, fridge).position.set(0, 0.65, FBACK+0.02);
-const liner = mesh(new THREE.BoxGeometry(0.678, 1.038, 0.658), M.liner, fridge, false);
-liner.position.set(0, 0.65, -0.031);
+mesh(new THREE.BoxGeometry(0.678, 1.038, 0.658), M.liner, fridge, false).position.set(0, 0.65, -0.031);
 
-// shelves + crisper drawers
 [0.42, 0.72, 1.00].forEach(y=>{
   mesh(new THREE.BoxGeometry(0.676, 0.006, 0.56), M.shelf, fridge, false).position.set(0, y, -0.07);
   mesh(new THREE.BoxGeometry(0.676, 0.014, 0.008), M.linerF, fridge).position.set(0, y, 0.214);
 });
 [-1,1].forEach(s=> mesh(new THREE.BoxGeometry(0.325, 0.17, 0.48), M.drawer, fridge, false).position.set(s*0.168, 0.225, -0.10));
-// groceries
 function food(geo, color, pos){ const m = mesh(geo, new THREE.MeshStandardMaterial({ color, roughness:0.6 }), fridge); m.position.set(...pos); return m; }
 food(new THREE.BoxGeometry(0.075, 0.19, 0.075), 0xf6f6f2, [-0.22, 0.818, -0.15]);
 food(new THREE.BoxGeometry(0.076, 0.02, 0.076), 0x2f6fb3, [-0.22, 0.918, -0.15]);
@@ -288,7 +308,6 @@ food(new THREE.CylinderGeometry(0.04, 0.04, 0.20, 24), 0xf0a030, [0.10, 0.523, -
 [[-0.2,0.18,-0.05,0xc8372d],[-0.12,0.18,-0.12,0x8bbf3f],[0.15,0.18,-0.08,0xe8762b]].forEach(([x,y,z,c])=>
   food(new THREE.SphereGeometry(0.035, 20, 14), c, [x, y, z]));
 
-// fresh-food door (hinged on the left, swings open for the "inside" option)
 const doorGroup = new THREE.Group(); doorGroup.position.set(-FX, 0, FFRONT); scene.add(doorGroup);
 mesh(new RoundedBoxGeometry(FW-0.006, 1.123, DT, 4, 0.014), M.door, doorGroup).position.set(FX, 0.6665, DT/2);
 mesh(new THREE.BoxGeometry(0.66, 1.0, 0.01), M.linerF, doorGroup).position.set(FX, 0.6665, -0.005);
@@ -301,7 +320,6 @@ mesh(new THREE.BoxGeometry(0.66, 1.0, 0.01), M.linerF, doorGroup).position.set(F
     s.rotation.x = Math.PI/2; s.position.set(hx, y, DT + 0.016);
   });
 }
-// freezer door + handle (static)
 mesh(new RoundedBoxGeometry(FW-0.006, 0.488, DT, 4, 0.014), M.door, fridge).position.set(0, 1.484, FFRONT + DT/2);
 {
   const x = FX - 0.07, z = FFRONT + DT + 0.032;
@@ -317,7 +335,6 @@ mesh(new THREE.BoxGeometry(FW-0.03, 0.055, 0.012), M.dark, fridge).position.set(
 });
 mesh(new RoundedBoxGeometry(0.05, 0.016, 0.06, 2, 0.004), M.handle, fridge).position.set(-FX+0.04, FTOP+0.008, FFRONT+0.02);
 
-// wall outlet + fridge's own plug (no FreshCam cable anymore)
 mesh(new RoundedBoxGeometry(0.07, 0.115, 0.006, 2, 0.002), M.plate, scene).position.set(0.26, 0.33, WALL_Z + 0.003);
 [0.355, 0.305].forEach(y=> mesh(new RoundedBoxGeometry(0.034, 0.038, 0.004, 2, 0.0015), M.socket, scene).position.set(0.26, y, WALL_Z + 0.007));
 mesh(new RoundedBoxGeometry(0.032, 0.036, 0.022, 3, 0.005), M.cord, scene).position.set(0.26, 0.357, -0.433);
@@ -325,11 +342,10 @@ mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([
   [0.243,0.357,-0.433],[0.22,0.35,-0.432],[0.17,0.25,-0.428],[0.05,0.16,-0.42],[-0.05,0.14,-0.405],[-0.10,0.15,-0.398]
 ].map(p=>new THREE.Vector3(...p)), false, 'centripetal'), 200, 0.004, 10), M.cord, scene);
 
-// adhesive steel plate for the inside mount (fridge liner is plastic)
 const steelPlate = mesh(new RoundedBoxGeometry(0.0006, 0.07, 0.04, 2, 0.0002), M.plateS, scene);
 steelPlate.position.set(0.3394, 0.90, 0.2235);
 
-/* ---------- FreshCam device (modeled in millimeters) ----------
+/* ---------- FreshCam v0.4 device (modeled in millimeters) ----------
    Local axes: +Z = front (lens), +Y = up, ±X = side magnets, -Z = back magnets.
    Body 40 × 60 × 27 mm: base z 0–14, front shell z 14–27. */
 const dev = new THREE.Group();
@@ -344,7 +360,7 @@ mesh(new RoundedBoxGeometry(40, 60, 14, 4, 3.2), M.base, baseGroup).position.z =
 mesh(new RoundedBoxGeometry(40, 60, 13, 5, 3.4), M.shell, shellGroup).position.z = 20.5;
 const shellMats = [M.shell, M.base];
 
-// front: lens window
+// Front: camera window
 const bez = mesh(new THREE.CylinderGeometry(8, 8, 1.2, 48), M.bezel, shellGroup);
 bez.rotation.x = Math.PI/2; bez.position.set(0, 13, 27.4);
 mesh(new THREE.TorusGeometry(5.5, 0.38, 12, 48), M.ring, shellGroup).position.set(0, 13, 28.0);
@@ -352,19 +368,27 @@ const glass = mesh(new THREE.CylinderGeometry(5.0, 5.0, 0.5, 48), M.glass, shell
 glass.rotation.x = Math.PI/2; glass.position.set(0, 13, 27.9);
 const lensDome = mesh(new THREE.SphereGeometry(2.6, 32, 16), M.lens, shellGroup);
 lensDome.scale.z = 0.35; lensDome.position.set(0, 13, 28.1);
+// Front: flash diffuser
 const flashWin = mesh(new THREE.CylinderGeometry(2.3, 2.3, 0.5, 32), M.flash, shellGroup);
 flashWin.rotation.x = Math.PI/2; flashWin.position.set(-11, 3, 27.15);
-// front: scan button with accent ring
-const scanButton = mesh(new THREE.CylinderGeometry(6.4, 6.4, 1.2, 48), M.button, shellGroup);
-scanButton.rotation.x = Math.PI/2; scanButton.position.set(0, -14, 27.4);
-mesh(new THREE.TorusGeometry(7.1, 0.35, 10, 48), M.accent, shellGroup).position.set(0, -14, 27.05);
-// status LED
-mesh(new THREE.SphereGeometry(0.9, 16, 12), M.led, shellGroup).position.set(14, -24.5, 26.95);
-// top: USB-C charge slot + charge LED
-mesh(new THREE.BoxGeometry(9.6, 0.6, 3.6), M.slot, shellGroup).position.set(0, 30.05, 17);
-mesh(new THREE.SphereGeometry(0.7, 12, 10), M.chgLed, shellGroup).position.set(8, 30.0, 17);
+// Front: PIR motion sensor lens (black IR-transparent, faceted Fresnel look)
+const pirBezel = mesh(new THREE.TorusGeometry(5.4, 0.4, 10, 40), M.bezel, shellGroup);
+pirBezel.position.set(0, -6, 27.05);
+const pirDome = mesh(new THREE.SphereGeometry(5, 14, 6, 0, Math.PI*2, 0, Math.PI/2), M.pir, shellGroup);
+pirDome.scale.y = 0.6; pirDome.rotation.x = Math.PI/2; pirDome.position.set(0, -6, 27);
+// Front: scan button (manual backup) with accent ring
+const scanButton = mesh(new THREE.CylinderGeometry(5.5, 5.5, 1.2, 48), M.button, shellGroup);
+scanButton.rotation.x = Math.PI/2; scanButton.position.set(0, -21, 27.4);
+mesh(new THREE.TorusGeometry(6.1, 0.32, 10, 48), M.accent, shellGroup).position.set(0, -21, 27.05);
+// Status LED
+mesh(new THREE.SphereGeometry(0.9, 16, 12), M.led, shellGroup).position.set(14, -25.5, 26.95);
+// Top: USB-C slot aligned with the XIAO's port + charge-LED light pipe
+mesh(new THREE.BoxGeometry(9.6, 0.6, 3.6), M.slot, shellGroup).position.set(0, 30.05, 19.9);
+mesh(new THREE.SphereGeometry(0.7, 12, 10), M.chgLed, shellGroup).position.set(8, 30.0, 19.9);
+// Wi-Fi FPC antenna stuck to the inside of the front shell
+mesh(new THREE.BoxGeometry(10, 14, 0.3), M.antenna, shellGroup).position.set(-12, -12, 25.6);
 
-// magnets: 2 left, 2 right, 2 back (embedded in the base walls)
+// Magnets: 2 left, 2 right, 2 back
 [-1, 1].forEach(s=>{
   [18, -18].forEach(y=>{
     const mg = mesh(new THREE.CylinderGeometry(6, 6, 3, 40), M.magnet, magGroup);
@@ -375,7 +399,6 @@ mesh(new THREE.SphereGeometry(0.7, 12, 10), M.chgLed, shellGroup).position.set(8
   const mg = mesh(new THREE.CylinderGeometry(6, 6, 3, 40), M.magnet, magGroup);
   mg.rotation.x = Math.PI/2; mg.position.set(0, y, 2.1);
 });
-// rubber grip pads on the three magnetic faces
 const pads = {
   L: mesh(new RoundedBoxGeometry(0.6, 44, 12, 2, 0.25), M.rubber, magGroup),
   R: mesh(new RoundedBoxGeometry(0.6, 44, 12, 2, 0.25), M.rubber, magGroup),
@@ -383,7 +406,7 @@ const pads = {
 };
 pads.L.position.set(-20.3, 0, 7); pads.R.position.set(20.3, 0, 7); pads.B.position.set(0, 0, -0.3);
 
-// battery
+// Battery
 function battTexture(){
   const c = document.createElement('canvas'); c.width = 256; c.height = 354;
   const g = c.getContext('2d');
@@ -396,40 +419,69 @@ function battTexture(){
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
 mesh(new RoundedBoxGeometry(32, 50, 8, 3, 1.5), M.batt, battGroup).position.set(0, -1, 8);
-const battLabel = mesh(new THREE.PlaneGeometry(26, 36), new THREE.MeshStandardMaterial({ map:battTexture(), roughness:0.6 }), battGroup, false);
-battLabel.position.set(0, -2, 12.06);
+mesh(new THREE.PlaneGeometry(26, 36), new THREE.MeshStandardMaterial({ map:battTexture(), roughness:0.6 }), battGroup, false).position.set(0, -2, 12.06);
 mesh(new THREE.BoxGeometry(22, 3.5, 1.6), M.pcbGrn, battGroup).position.set(0, 25.6, 8);
 
-// electronics
-mesh(new THREE.BoxGeometry(27, 40.5, 1.6), M.pcb, boardGroup).position.set(0, -3, 14.8);
-mesh(new THREE.BoxGeometry(16, 18, 2.6), M.can, boardGroup).position.set(0, -10, 16.9);
-mesh(new THREE.BoxGeometry(15, 4.5, 0.15), M.gold, boardGroup).position.set(0, -21, 15.7);
-mesh(new THREE.BoxGeometry(10, 3, 1.5), M.dark, boardGroup).position.set(0, 0.5, 16.3);
-mesh(new THREE.BoxGeometry(8, 9, 0.3), M.ribbon, boardGroup).position.set(0, 6.5, 17.2);
-mesh(new THREE.BoxGeometry(8.5, 8.5, 4), M.dark, boardGroup).position.set(0, 13, 19.5);
-const barrel = mesh(new THREE.CylinderGeometry(3.6, 3.6, 4, 32), M.dark, boardGroup);
-barrel.rotation.x = Math.PI/2; barrel.position.set(0, 13, 23.5);
-const camGlass = mesh(new THREE.CylinderGeometry(2.4, 2.4, 0.3, 32), M.lens, boardGroup);
-camGlass.rotation.x = Math.PI/2; camGlass.position.set(0, 13, 25.6);
-mesh(new THREE.BoxGeometry(3.2, 3.2, 1.2), M.flash, boardGroup).position.set(-11, 3, 16.2);
-mesh(new THREE.BoxGeometry(14, 15, 1.8), M.can, boardGroup).position.set(0, 2, 13.1);
-// charger + boost + power-latch board
-mesh(new THREE.BoxGeometry(22, 8, 1.2), M.pcbBlue, boardGroup).position.set(0, 24, 14.8);
-[[-6.5,23],[0,22.5],[6.5,23]].forEach(([x,y])=> mesh(new THREE.BoxGeometry(4, 3.5, 1), M.dark, boardGroup).position.set(x, y, 15.9));
-mesh(new RoundedBoxGeometry(9, 4, 3.2, 2, 1.2), M.can, boardGroup).position.set(0, 28, 17);
-// tactile switch behind the scan button
-mesh(new THREE.BoxGeometry(6, 6, 3.5), M.dark, boardGroup).position.set(0, -14, 23.6);
-function wire(pts, mat, r=0.5){
-  const c = new THREE.CatmullRomCurve3(pts.map(p=>new THREE.Vector3(...p)), false, 'centripetal');
-  mesh(new THREE.TubeGeometry(c, 60, r, 8), mat, boardGroup);
+/* --- XIAO ESP32S3 Sense stack (21 × 17.5 mm, USB-C facing up) --- */
+function xiaoTexture(){
+  const c = document.createElement('canvas'); c.width = 175; c.height = 120;
+  const g = c.getContext('2d');
+  g.fillStyle = '#b9bdc2'; g.fillRect(0,0,175,120);
+  g.fillStyle = '#2a2d31'; g.font = 'bold 22px Inter, sans-serif'; g.fillText('XIAO', 14, 38);
+  g.font = '600 17px Inter, sans-serif'; g.fillText('ESP32S3', 14, 62);
+  g.font = '13px JetBrains Mono, monospace'; g.fillStyle = '#4a4e54'; g.fillText('Seeed Studio', 14, 92);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
-wire([[-5,26.5,9.5],[-5,27.5,12.5],[-6,23,14.1]], M.red);                                  // battery +
-wire([[5,26.5,9.5],[5,27.5,12.5],[6,23,14.1]], M.blackW);                                   // battery −
-wire([[-9,21,15.5],[-15,16,16.5],[-15.2,-10,16.5],[-12.2,-20,15.8]], M.red);               // 5V → ESP32-CAM
-wire([[9,21,15.5],[15,16,16.5],[15.2,-10,16.5],[12.2,-20,15.8]], M.blackW);                 // GND → ESP32-CAM
-wire([[3,-14,21.9],[8,-18,19],[11,-22,16]], M.dark, 0.35);                                  // button → latch
+// Sense expansion board (rear), B2B connector, main XIAO board (front)
+mesh(new THREE.BoxGeometry(17.5, 21, 1.2), M.pcb, boardGroup).position.set(0, 18.5, 14.6);
+mesh(new THREE.BoxGeometry(2.5, 1.2, 0.6), M.dark, boardGroup).position.set(-5, 12, 13.7);   // mic
+mesh(new THREE.BoxGeometry(12, 11, 1.6), M.can, boardGroup).position.set(0, 21, 13.2);        // SD slot (rear)
+mesh(new THREE.BoxGeometry(6, 4, 2.2), M.dark, boardGroup).position.set(0, 18.5, 16.3);       // B2B connector
+mesh(new THREE.BoxGeometry(17.5, 21, 1.2), M.pcbBlue, boardGroup).position.set(0, 18.5, 18.0);
+[-1,1].forEach(s=>{ for(let i=0;i<7;i++){
+  mesh(new THREE.CylinderGeometry(0.6, 0.6, 1.3, 10), M.gold, boardGroup).position.set(s*7.9, 9.5 + i*2.54, 18.0).rotation.x = Math.PI/2;
+}});
+mesh(new THREE.BoxGeometry(13, 12, 2.0), M.can, boardGroup).position.set(0, 16.5, 19.6);       // RF shield
+const xiaoLabel = mesh(new THREE.PlaneGeometry(12, 8.2), new THREE.MeshStandardMaterial({ map:xiaoTexture(), roughness:0.4, metalness:0.4 }), boardGroup, false);
+xiaoLabel.position.set(0, 18.5, 20.62);
+mesh(new RoundedBoxGeometry(9, 4.5, 3.2, 2, 1.2), M.can, boardGroup).position.set(0, 27.6, 20.2); // USB-C
+mesh(new THREE.BoxGeometry(1.2, 0.8, 0.6), M.chgLed, boardGroup).position.set(6.5, 27.5, 18.9);  // onboard charge LED
+mesh(new THREE.CylinderGeometry(0.9, 0.9, 1.2, 12), M.can, boardGroup).position.set(6, 10.5, 19.2).rotation.x = Math.PI/2; // U.FL
 
-/* ---------- Camera field of view + sample grocery item (in device space, mm) ---------- */
+// Autofocus camera module (OV5640) mounted behind the lens window
+mesh(new THREE.BoxGeometry(8.5, 8.5, 4.6), M.dark, boardGroup).position.set(0, 13, 23.1);
+const barrel = mesh(new THREE.CylinderGeometry(3.8, 3.8, 1.8, 32), M.dark, boardGroup);
+barrel.rotation.x = Math.PI/2; barrel.position.set(0, 13, 26.0);
+const camGlass = mesh(new THREE.CylinderGeometry(2.6, 2.6, 0.3, 32), M.lens, boardGroup);
+camGlass.rotation.x = Math.PI/2; camGlass.position.set(0, 13, 26.8);
+
+// PIR sensor body behind its lens
+const pirBody = mesh(new THREE.CylinderGeometry(4.6, 4.6, 11, 24), M.pcbW, boardGroup);
+pirBody.rotation.x = Math.PI/2; pirBody.position.set(0, -6, 21.0);
+
+// Flash LED on a tiny board
+mesh(new THREE.BoxGeometry(5, 5, 0.8), M.pcb, boardGroup).position.set(-11, 3, 25.2);
+mesh(new THREE.BoxGeometry(3, 3, 1.0), M.flash, boardGroup).position.set(-11, 3, 26.0);
+
+// Power switch board + tactile switch on a standoff
+mesh(new THREE.BoxGeometry(16, 9, 1.2), M.pcbGrn, boardGroup).position.set(0, -21, 15.0);
+[[-4.5,-19.5],[0,-22.5],[4.5,-19.5]].forEach(([x,y])=> mesh(new THREE.BoxGeometry(3, 2.5, 1), M.dark, boardGroup).position.set(x, y, 16.1));
+mesh(new THREE.BoxGeometry(4, 4, 7), M.dark, boardGroup).position.set(0, -21, 19.1);
+mesh(new THREE.BoxGeometry(6, 6, 3.4), M.dark, boardGroup).position.set(0, -21, 24.3);
+
+function wire(pts, mat, r=0.5, parent=boardGroup){
+  const c = new THREE.CatmullRomCurve3(pts.map(p=>new THREE.Vector3(...p)), false, 'centripetal');
+  mesh(new THREE.TubeGeometry(c, 80, r, 8), mat, parent);
+}
+wire([[0,9,14.2],[0,6.6,16],[0,7.2,19.8],[0,9.2,20.9]], M.ribbon, 0.7);                         // camera flex
+wire([[-5,26.5,9.5],[-12,27.5,12.8],[-15.2,12,13.2],[-14.5,-14,13.8],[-6,-21,15.7]], M.red);        // battery+ → switch
+wire([[6,-17.5,15.7],[14,-10,15.4],[14.8,6,15.2],[7.5,9,14.0]], M.red);                              // switch → XIAO BAT+
+wire([[5,26.5,9.5],[6,28.5,12.5],[4.5,27,14.0]], M.blackW);                                          // GND
+wire([[1.5,-6,15.6],[2.5,-12,15.8],[3,-17,15.7]], M.yellow, 0.35);                                   // PIR → switch
+wire([[6,10.5,19.8],[-2,6,24.5],[-10,-4,25.4],[-12,-6,25.5]], M.dark, 0.3);                         // U.FL → antenna
+wire([[-7,10,18.6],[-10,6,22],[-11,3.5,25]], M.dark, 0.3);                                          // GPIO → flash
+
+/* ---------- Field of view + sample item (device space, mm) ---------- */
 const fovGroup = new THREE.Group(); dev.add(fovGroup);
 const FOV_LEN = 260, FOV_R = Math.tan(THREE.MathUtils.degToRad(33)) * FOV_LEN * Math.SQRT2;
 const coneGeo = new THREE.ConeGeometry(FOV_R, FOV_LEN, 4, 1, true);
@@ -439,6 +491,12 @@ const cone = new THREE.Mesh(coneGeo, coneMat); cone.position.set(0, 13, 28); fov
 const coneEdges = new THREE.LineSegments(new THREE.EdgesGeometry(coneGeo),
   new THREE.LineBasicMaterial({ color:0x1f6f5c, transparent:true, opacity:0.45 }));
 coneEdges.position.set(0, 13, 28); fovGroup.add(coneEdges);
+
+// PIR detection zone (wide, faint)
+const pirGeo = new THREE.ConeGeometry(260, 420, 32, 1, true);
+pirGeo.translate(0, -210, 0); pirGeo.rotateX(-Math.PI/2);
+const pirZoneMat = new THREE.MeshBasicMaterial({ color:0xc9842b, transparent:true, opacity:0, side:THREE.DoubleSide, depthWrite:false });
+const pirZone = new THREE.Mesh(pirGeo, pirZoneMat); pirZone.position.set(0, -6, 28); fovGroup.add(pirZone);
 
 function itemTexture(){
   const c = document.createElement('canvas'); c.width = 256; c.height = 384;
@@ -458,7 +516,8 @@ const plain = new THREE.MeshStandardMaterial({ color:0x3a6ea5, roughness:0.6 });
 const lid = new THREE.MeshStandardMaterial({ color:0xeeeae2, roughness:0.4, metalness:0.2 });
 const front = new THREE.MeshStandardMaterial({ map:itemTexture(), roughness:0.55 });
 const item = mesh(new THREE.BoxGeometry(70, 100, 50), [plain, plain, lid, plain, front, front], fovGroup);
-item.position.set(0, 13, 248);
+const ITEM_Z = 248;
+item.position.set(0, 13, ITEM_Z);
 item.rotation.y = -0.3;
 
 /* ---------- Labels ---------- */
@@ -475,16 +534,18 @@ function label(title, sub, pos, parent=scene, kind='overview', isNew=false){
   o.userData.el = el;
   return o;
 }
-const unitLabel = label('FreshCam unit', '', [0, 52, 14], dev, 'overview', true);
-const plateLabel = label('Adhesive steel plate', 'liner is plastic, so magnets snap to this', [0.3394, 0.97, 0.2235], scene, 'special', true);
-const itemLabel  = label('Item held in front', 'barcode + printed date, ~20–25 cm', [0, 85, 248], fovGroup, 'special');
+const unitLabel  = label('FreshCam v0.4', '', [0, 52, 14], dev, 'overview', true);
+const plateLabel = label('Adhesive steel plate', 'liner is plastic, so magnets snap to this', [0.3394, 0.97, 0.2235], scene, 'special');
+const itemLabel  = label('Item held in front', 'motion wakes it, then it scans at ~20–25 cm', [0, 85, ITEM_Z], fovGroup, 'special');
 
-label('Lens window', 'gloss bezel + flash diffuser', [34, 13, 28], shellGroup, 'detail');
-label('Scan button', 'press to wake + scan', [34, -14, 27], shellGroup, 'detail', true);
-label('USB-C charging port', 'any phone charger', [0, 40, 17], boardGroup, 'detail', true);
-label('ESP32-CAM', 'Wi-Fi + OV2640 camera', [34, -2, 15], boardGroup, 'detail');
-label('1500 mAh LiPo battery', 'sits behind the board', [-40, -6, 8], battGroup, 'detail', true);
-label('6 magnets', 'left · right · back + rubber pads', [-38, -30, 4], magGroup, 'detail', true);
+label('Autofocus camera', 'OV5640 on the XIAO Sense', [36, 13, 25], boardGroup, 'detail', true);
+label('Motion sensor (PIR)', 'wakes it automatically', [36, -5, 27], shellGroup, 'detail', true);
+label('Scan button', 'manual backup wake', [36, -21, 27], shellGroup, 'detail');
+label('XIAO ESP32S3 Sense', 'Wi-Fi + charging built in', [-38, 25, 18], boardGroup, 'detail', true);
+label('USB-C charging', 'XIAO port · ~15–18 h full charge', [0, 41, 20], boardGroup, 'detail', true);
+label('1500 mAh LiPo battery', 'behind the board', [-40, -6, 8], battGroup, 'detail');
+label('Power switch circuit', 'cuts power between scans', [0, -40, 15], boardGroup, 'detail', true);
+label('6 magnets', 'left · right · back + rubber pads', [-38, -30, 4], magGroup, 'detail');
 
 /* ---------- Mounting options ---------- */
 const MOUNTS = {
@@ -492,25 +553,25 @@ const MOUNTS = {
     pos:[0.4006, 1.30, 0.262], pad:'L', door:0, plate:false, unit:'Right side panel · left magnets',
     over:{ p:[1.75,1.5,2.0],  t:[0.05,0.9,-0.05] },
     close:{ p:[0.68,1.42,0.58], t:[0.40,1.30,0.275] },
-    desc:'<b>Right side panel.</b> The left magnets hold it to the painted steel side panel, just behind the door line. It stays out of the way but is easy to reach.'
+    desc:'<b>Right side panel.</b> The left magnets hold it to the painted steel side panel, just behind the door line. The motion sensor faces the area in front of the fridge.'
   },
   sideL: {
     pos:[-0.4006, 1.30, 0.12], pad:'R', door:0, plate:false, unit:'Left side panel · right magnets',
     over:{ p:[-1.75,1.5,2.0], t:[-0.05,0.9,-0.05] },
     close:{ p:[-0.68,1.42,0.45], t:[-0.40,1.30,0.135] },
-    desc:'<b>Left side panel.</b> Uses the right-side magnets. Good when the fridge\'s right side is against a wall or cabinet. It sits a little farther back so the door hinge never hits it.'
+    desc:'<b>Left side panel.</b> Uses the right-side magnets, for when the right side of the fridge is against a wall or cabinet. It sits farther back so the door hinge never hits it.'
   },
   door: {
     pos:[-0.10, 1.08, 0.3556], pad:'B', door:0, plate:false, unit:'Door front · back magnets',
     over:{ p:[1.0,1.35,2.3],  t:[0,0.95,0] },
     close:{ p:[0.12,1.16,0.68], t:[-0.10,1.09,0.37] },
-    desc:'<b>Door front.</b> The back magnets hold it at eye level, which makes it the easiest spot to reach. Many stainless-steel doors aren\'t magnetic, so test first and use the adhesive steel plate if a magnet won\'t stick.'
+    desc:'<b>Door front.</b> The back magnets hold it at eye level, the easiest spot to reach. It gets the most false wake-ups from people walking past, so expect the shorter end of the battery estimate. Test whether a stainless door holds a magnet, or use the steel plate.'
   },
   inside: {
     pos:[0.3189, 0.90, 0.21], pad:'R', door:-1.85, plate:true, unit:'Inside the fridge · right magnets',
     over:{ p:[0.85,1.35,2.0], t:[0.0,0.8,0.0] },
     close:{ p:[0.10,1.0,0.70], t:[0.30,0.91,0.23] },
-    desc:'<b>Inside the fridge.</b> The walls inside are plastic, so stick the steel plate on the side wall first. The side magnets then snap onto it. The lens faces the door opening, so you scan items as you put them away. Charge it at room temperature, and don\'t mount it in the freezer.'
+    desc:'<b>Inside the fridge.</b> This works best with auto-wake: it stays dark and off while the door is shut, and wakes when you reach in. Stick the steel plate on the side wall first. Charge it outside the fridge, never below about 5 °C.'
   },
 };
 const mountDesc = document.getElementById('mountDesc');
@@ -521,7 +582,7 @@ function applyMount(key){
   dev.position.set(...m.pos);
   Object.entries(pads).forEach(([k, p]) => p.material = (k === m.pad) ? M.padOn : M.rubber);
   steelPlate.visible = m.plate;
-  unitLabel.userData.el.innerHTML = `<b>FreshCam unit</b><span>${m.unit}</span>`;
+  unitLabel.userData.el.innerHTML = `<b>FreshCam v0.4</b><span>${m.unit}</span>`;
 }
 function setMount(key){
   if (key === (pendingKey || mountKey)) return;
@@ -558,21 +619,41 @@ document.getElementById('tXray').onchange = e => {
 document.getElementById('tFov').onchange = e => { state.fov = e.target.checked; fovGroup.visible = state.fov; };
 document.getElementById('tLabels').onchange = e => state.labels = e.target.checked;
 
-let scanStart = -1e9;
-document.getElementById('scanBtn').onclick = () => {
-  scanStart = performance.now();
+/* ---------- Scan simulation ---------- */
+const statusEl = document.getElementById('status');
+let scanStart = -1e9, scanMode = 'auto';
+function startScan(mode){
+  scanMode = mode; scanStart = performance.now();
   if (!state.fov){ state.fov = true; fovGroup.visible = true; document.getElementById('tFov').checked = true; }
-};
+}
+document.getElementById('autoBtn').onclick = () => startScan('auto');
+document.getElementById('pressBtn').onclick = () => startScan('button');
+
+function statusText(t){
+  if (t < 0 || t > 3.2) return null;
+  if (scanMode === 'auto'){
+    if (t < 0.55) return 'OFF · 0 µA (PIR watching)';
+    if (t < 0.85) return 'Motion detected → power on';
+    if (t < 1.7)  return 'Autofocus + flash → reading barcode & date';
+    if (t < 2.6)  return 'Wi-Fi upload → app updated ✓';
+    return 'Power off';
+  } else {
+    if (t < 0.3) return 'Button pressed → power on';
+    if (t < 1.2) return 'Autofocus + flash → reading barcode & date';
+    if (t < 2.2) return 'Wi-Fi upload → app updated ✓';
+    return 'Power off';
+  }
+}
 
 /* ---------- Loop ---------- */
 const devWorld = new THREE.Vector3();
 const green = new THREE.Color(0x1f6f5c), bright = new THREE.Color(0x2bd47d);
 const ease = x => 1 - Math.pow(1 - x, 3);
+const pulse = (t, a, b) => (t >= a && t < b) ? Math.sin((t - a) / (b - a) * Math.PI) : 0;
 function animate(){
   requestAnimationFrame(animate);
   const k = 0.12;
 
-  // mount transition: shrink out, move, grow in (avoids clipping through the fridge)
   if (transT < 1){
     transT = Math.min(1, transT + 0.04);
     if (transT >= 0.5 && pendingKey){ mountKey = pendingKey; pendingKey = null; applyMount(mountKey); }
@@ -580,11 +661,9 @@ function animate(){
     dev.scale.setScalar(0.001 * Math.max(0.02, ease(s)));
   }
 
-  // door swing + interior light
   doorGroup.rotation.y += (doorTarget - doorGroup.rotation.y) * 0.07;
   fridgeLight.intensity = 0.5 * Math.min(1, Math.abs(doorGroup.rotation.y) / 1.85);
 
-  // exploded view
   shellGroup.position.z += ((state.exploded ? 46 : 0) - shellGroup.position.z) * k;
   boardGroup.position.z += ((state.exploded ? 24 : 0) - boardGroup.position.z) * k;
   battGroup.position.z  += ((state.exploded ? 11 : 0) - battGroup.position.z)  * k;
@@ -596,16 +675,32 @@ function animate(){
   }
   controls.update();
 
-  // simulated scan: button press + flash + FOV pulse
-  const s = (performance.now() - scanStart) / 900;
-  const press = s >= 0 && s < 0.25 ? Math.sin(s / 0.25 * Math.PI) : 0;
-  const on = s >= 0.2 && s < 1.2 ? Math.sin((s - 0.2) * Math.PI) : 0;
+  // Scan sequence
+  const t = (performance.now() - scanStart) / 1000;
+  let press = 0, pirOn = 0, flash = 0, awake = 0;
+  if (scanMode === 'auto'){
+    item.position.z = (t >= 0 && t < 0.7) ? 420 - (420 - ITEM_Z) * ease(t / 0.7) : ITEM_Z;
+    pirOn = pulse(t, 0.4, 1.0);
+    flash = pulse(t, 0.95, 1.7);
+    awake = (t >= 0.6 && t < 2.6) ? 1 : 0;
+  } else {
+    item.position.z = ITEM_Z;
+    press = pulse(t, 0, 0.25);
+    flash = pulse(t, 0.4, 1.15);
+    awake = (t >= 0.1 && t < 2.2) ? 1 : 0;
+  }
   scanButton.position.z = 27.4 - press * 0.8;
-  M.flash.emissiveIntensity = 0.15 + on * 3.5;
-  coneMat.opacity = 0.07 + on * 0.18;
-  coneMat.color.copy(green).lerp(bright, on);
-  M.led.emissiveIntensity = 0.8 + 0.6 * (0.5 + 0.5 * Math.sin(performance.now() / 500)) + on * 2;
-  M.accent.emissiveIntensity = 0.35 + press * 1.5 + on * 0.8;
+  M.pir.emissiveIntensity = pirOn * 0.9;
+  pirZoneMat.opacity = pirOn * 0.06;
+  M.flash.emissiveIntensity = 0.15 + flash * 3.5;
+  coneMat.opacity = 0.07 + flash * 0.18;
+  coneMat.color.copy(green).lerp(bright, flash);
+  M.accent.emissiveIntensity = 0.25 + awake * 0.9 + press * 1.2;
+  M.led.emissiveIntensity = awake ? 1.6 + 0.6 * Math.sin(performance.now() / 120) : 0.15;
+
+  const st = statusText(t);
+  statusEl.style.opacity = st ? 1 : 0;
+  if (st) statusEl.textContent = st;
 
   dev.getWorldPosition(devWorld);
   const d = camera.position.distanceTo(devWorld);
